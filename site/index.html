@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArduCopter Error Wiki</title>
+<meta name="description" content="Поиск по сообщениям и ошибкам ArduCopter 4.6.3 с причинами и решениями. Данные вытащены из исходников ArduPilot.">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%F0%9F%9A%81%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="#" id="home"><span class="logo">🚁</span><span>ArduCopter <b>Error Wiki</b></span><span class="ver" id="ver"></span></a>
+    <nav class="tabs" role="tablist">
+      <button class="tab on" data-tab="search" role="tab">Поиск ошибок</button>
+      <button class="tab" data-tab="codes" role="tab">Коды лога</button>
+      <button class="tab" data-tab="about" role="tab">О проекте</button>
+    </nav>
+    <button class="theme" id="theme" title="Тема" aria-label="Сменить тему">◐</button>
+  </div>
+</header>
+
+<main class="wrap">
+<section id="tab-search" class="pane on">
+  <div class="hero">
+    <h1>Что написал автопилот?</h1>
+    <p>Вставь сообщение целиком (<code>PreArm: Compass offsets too high</code>), кусок или опиши словами по-русски: «компас», «не армится», «батарея».</p>
+    <div class="searchbox">
+      <input id="q" type="text" autocomplete="off" spellcheck="false" placeholder="Введи сообщение или слово…" autofocus>
+      <button id="clear" class="x" title="Очистить" aria-label="Очистить">×</button>
+    </div>
+    <div class="chips" id="quick"></div>
+  </div>
+
+  <div class="filters">
+    <div class="sevs" id="sevs"></div>
+    <select id="sub" aria-label="Подсистема"><option value="">Все подсистемы</option></select>
+    <label class="chk"><input type="checkbox" id="onlyCur"> только с разбором</label>
+    <label class="chk"><input type="checkbox" id="onlyCopter" checked> актуально для Copter</label>
+  </div>
+  <div class="meta" id="meta"></div>
+  <div id="results" class="results"></div>
+  <button id="more" class="more" hidden>Показать ещё</button>
+</section>
+
+<section id="tab-codes" class="pane">
+  <h2>Коды в логах (LOG → ERR, Internal Errors)</h2>
+  <p class="lead">В .bin логах (Mission Planner → Review a Log → <code>ERR</code>) ошибки записаны парой <b>Subsys / ECode</b>. Выбери их ниже — расшифровка по исходникам 4.6.3.</p>
+  <div class="card">
+    <div class="row">
+      <label>Subsys <select id="e-sub"></select></label>
+      <label>ECode <select id="e-code"></select></label>
+    </div>
+    <div id="e-out" class="out"></div>
+  </div>
+  <h3>Таблица Subsys</h3>
+  <div class="tbl-wrap"><table id="t-sub"></table></div>
+  <h3>Таблица ECode</h3>
+  <div class="tbl-wrap"><table id="t-code"></table></div>
+  <h2 style="margin-top:2rem">Internal Errors (маска)</h2>
+  <p class="lead">Сообщения <code>Internal Errors 0x…</code> и <code>PreArm: Internal errors 0x…</code> — это битовая маска. Вставь значение, получишь расшифровку.</p>
+  <div class="card">
+    <input id="mask" class="mask" placeholder="например 0x4000 или 16384" inputmode="text">
+    <div id="m-out" class="out"></div>
+  </div>
+  <div class="tbl-wrap"><table id="t-int"></table></div>
+</section>
+
+<section id="tab-about" class="pane">
+  <h2>О проекте</h2>
+  <div class="card prose">
+    <p>Справочник собран автоматически из исходников <b id="a-tag"></b> (<a href="https://github.com/ArduPilot/ardupilot" target="_blank" rel="noopener">github.com/ArduPilot/ardupilot</a>): все вызовы <code>GCS_SEND_TEXT</code>, <code>send_text</code>, <code>check_failed</code> и сообщения проверок (<code>failure_msg</code>) в <code>ArduCopter/</code> и <code>libraries/</code>.</p>
+    <p>Для каждого сообщения показаны: шаблон текста (<code>%u</code>, <code>%s</code> — подставляемые значения), файл и строка в исходниках, фрагмент кода с условием срабатывания и параметры, которые упоминаются рядом, вместе с описаниями из исходников.</p>
+    <p><b>Причины и шаги решения</b> написаны вручную по документации и коду. Там, где разбора пока нет, показано условие из кода и общая подсказка по подсистеме: именно оно говорит, почему сообщение появилось.</p>
+    <p>Всегда сверяйся с логом полёта и официальной документацией: <a href="https://ardupilot.org/copter/" target="_blank" rel="noopener">ardupilot.org/copter</a>, форум <a href="https://discuss.ardupilot.org/" target="_blank" rel="noopener">discuss.ardupilot.org</a>.</p>
+    <p class="warn">⚠ Отключение проверок (<code>ARMING_CHECK</code>, failsafe) убирает защиту. Используй только для стендовых тестов без пропеллеров.</p>
+    <p>Обновление данных под новую версию: <code>python build/build.py src/ap site</code> (см. README в репозитории).</p>
+  </div>
+  <div class="stats" id="stats"></div>
+</section>
+</main>
+
+<footer class="wrap foot">Данные: ArduPilot (GPLv3), <span id="f-tag"></span> · не официальный ресурс ArduPilot</footer>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
