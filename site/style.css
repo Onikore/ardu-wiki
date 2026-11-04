@@ -106,3 +106,6 @@ details.code > div,details.code > pre{margin:8px 12px}
 .src.hand{background:var(--info-bg);color:var(--info)}
 .cond{margin:4px 0}.cond code{display:block;white-space:pre-wrap;word-break:break-word;padding:8px 10px;font-size:.85rem}
 .srcline{margin-top:4px;font-style:italic}
+.big{font-size:1.02rem;line-height:1.5}
+details.code h4{margin:12px 12px 4px}
+details.code > ul,details.code > ol{margin:4px 12px 4px 30px}

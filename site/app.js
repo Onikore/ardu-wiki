@@ -42,8 +42,8 @@
     var pn = m.p.map(function (p) { return p.name; }).join(" ");
     m._pn = pn.toLowerCase();
     m._t = m.text.toLowerCase();
-    m._ti = (m.t || "").toLowerCase();
-    m._h = (m.text + " " + m.t + " " + m.c + " " + m.f.join(" ") + " " + pn + " " + m.sub + " " + m.file.split("/").pop()).toLowerCase();
+    m._ti = ((m.t || "") + " " + (m.st || "")).toLowerCase();
+    m._h = (m.text + " " + m.t + " " + (m.st || "") + " " + (m.sw || "") + " " + m.c + " " + m.f.join(" ") + " " + pn + " " + m.sub + " " + m.file.split("/").pop()).toLowerCase();
     m._w = {};
     m._t.split(/[^a-z0-9_]+/).forEach(function (w) { if (w) m._w[w] = 1; });
     var tr = tplRe(m.text); m._re = tr.lit >= 10 ? tr.re : null; m._lit = tr.lit;
@@ -137,13 +137,6 @@
   });
   $("#sub").onchange = run; $("#onlyCur").onchange = run; $("#onlyCopter").onchange = run;
 
-  /* ---------- quick chips ---------- */
-  ["PreArm", "компас", "GPS", "EKF", "батарея", "failsafe", "вибрации", "не армится", "пульт", "моторы", "дальномер", "SD карта", "fence"].forEach(function (t) {
-    var b = document.createElement("button"); b.className = "chip"; b.textContent = t;
-    b.onclick = function () { $("#q").value = t; run(true); $("#q").focus(); };
-    $("#quick").appendChild(b);
-  });
-
   /* ---------- render ---------- */
   var cur = [], shown = 0, PAGE = 30, openId = null, lastQ = "";
   function hl(text, toks) {
@@ -171,7 +164,7 @@
     var html = '<div class="item' + (open ? " open" : "") + '" id="i-' + m.id + '">' +
       '<button class="head" data-id="' + m.id + '" aria-expanded="' + open + '"><div class="line1"><span class="badge b-' + esc(m.sev) + '">' + esc(m.sev) + '</span>' +
       '<div><div class="msg">' + hl(m.text, toks) + '</div>' +
-      (m.t ? '<div class="title">' + esc(m.t) + '</div>' : "") +
+      ((m.st || m.t) ? '<div class="title">' + esc(m.st || m.t) + '</div>' : "") +
       '<div class="tags"><span class="tag">' + esc(m.sub) + '</span>' + (m.cur ? '<span class="tag ok">сверено с кодом</span>' : "") + '</div></div></div></button>' +
       '<div class="body">' + (open ? detail(m) : "") + "</div></div>";
     return html;
@@ -181,17 +174,26 @@
   }
   function detail(m) {
     var h = "";
-    if (m.cur) {
-      h += "<h4>Возможная причина</h4><div>" + esc(m.c) + "</div>";
-      if (m.causes && m.causes.length) h += list("ul", m.causes);
-      var steps = m.f.concat(m.more || []);
-      if (steps.length) h += "<h4>Как решить</h4>" + list("ol", steps);
-      if (m.ignore) h += '<div class="note" style="margin-top:6px"><b>Можно ли игнорировать:</b> ' + esc(m.ignore) + "</div>";
+    if (m.cur && m.sw) {
+      h += "<h4>Что случилось</h4><div class=\"big\">" + esc(m.sw) + "</div>";
+      h += "<h4>Что сделать</h4>" + list("ol", m.ss || []);
+    } else if (m.cur) {
+      h += "<h4>Что случилось</h4><div class=\"big\">" + esc(m.c) + "</div>";
+      if (m.f.length) h += "<h4>Что сделать</h4>" + list("ol", m.f);
     } else {
-      h += "<h4>Возможная причина</h4><div class=\"note\">Ручной разбор не написан: сообщение информационное или относится не к Copter. Условие срабатывания — в блоке ниже.</div>";
+      h += "<h4>Что случилось</h4><div class=\"note\">Служебное сообщение: обычно ничего делать не нужно. Если сомневаешься — передай настройщику.</div>";
     }
-    // всё техническое — в свёрнутом блоке
+    // подробности для техника — свёрнуто
     var c = "";
+    if (m.cur) {
+      c += "<h4>Причина (по коду " + esc(W.tag) + ")</h4><div>" + esc(m.c) + "</div>";
+      if (m.causes && m.causes.length) c += list("ul", m.causes);
+      var steps = m.f.concat(m.more || []);
+      if (steps.length) c += "<h4>Подробные шаги</h4>" + list("ol", steps);
+      if (m.diag && m.diag.length) c += "<h4>Как проверить</h4>" + list("ul", m.diag);
+      if (m.ignore) c += '<div class="note"><b>Можно ли игнорировать:</b> ' + esc(m.ignore) + "</div>";
+    }
+    c += "<h4>Код</h4>";
     if (m.cond) c += '<div class="cond"><code>' + esc(m.cond) + "</code></div>";
     c += '<div class="note">' + (m.gh ? '<a href="' + esc(m.gh) + '" target="_blank" rel="noopener">' + esc(m.file) + ":" + m.line + "</a>" : esc(m.file)) +
       (m.func ? " · " + esc(m.func) + "()" : "") + "</div>";
@@ -199,7 +201,7 @@
     if (m.chk && m.chk.bit) c += '<div class="note">Проверка из группы «' + esc(m.chk.ru) + "» — бит " + m.chk.bit + " в ARMING_CHECK.</div>";
     if (m.ctx) c += "<pre>" + esc(m.ctx) + "</pre>";
     if (m.p.length) {
-      c += m.p.map(function (p) {
+      c += "<h4>Параметры</h4>" + m.p.map(function (p) {
         return '<div class="p"><b>' + esc(p.name) + "</b>" + (p.display ? " — " + esc(p.display) : "") +
           (p.desc ? "<small>" + esc(p.desc.length > 300 ? p.desc.slice(0, 300) + "…" : p.desc) + "</small>" : "") +
           (p.values ? "<small>значения: " + esc(p.values.length > 220 ? p.values.slice(0, 220) + "…" : p.values) + "</small>" : "") +
@@ -211,7 +213,7 @@
     var qq = encodeURIComponent(m.text.replace(SPEC, "").replace(/\s+/g, " ").trim());
     links.push('<a href="https://discuss.ardupilot.org/search?q=' + qq + '" target="_blank" rel="noopener">Форум ArduPilot</a>');
     c += '<div class="links">' + links.join("") + '<button class="cp" data-copy="' + m.id + '">Скопировать ссылку</button></div>';
-    h += '<details class="code"><summary>Код, параметры и ссылки</summary>' + c + "</details>";
+    h += '<details class="code"><summary>Подробно (для настройщика)</summary>' + c + "</details>";
     return h;
   }
   function render() {

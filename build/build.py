@@ -10,6 +10,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import kb  # noqa  (только DOCS и таблицы кодов лога / internal errors — они взяты из enum'ов исходников)
 from kb_verified import VERIFIED  # noqa
+from kb_simple import SIMPLE  # noqa
 import validate  # noqa
 CHK_BIT = {'BARO':(1,'Барометр'),'COMPASS':(2,'Компас'),'GPS':(3,'GPS-фикс'),'INS':(4,'IMU'),'PARAMETERS':(5,'Параметры'),'RC':(6,'Каналы RC'),'VOLTAGE':(7,'Напряжение платы'),'BATTERY':(8,'Уровень батареи'),'AIRSPEED':(9,'Airspeed'),'LOGGING':(10,'Логирование'),'SWITCH':(11,'Safety switch'),'GPS_CONFIG':(12,'Конфигурация GPS'),'SYSTEM':(13,'Система'),'MISSION':(14,'Миссия'),'RANGEFINDER':(15,'Дальномер'),'CAMERA':(16,'Камера'),'AUX_AUTH':(17,'Aux-авторизация'),'VISION':(18,'Visual Odometry'),'FFT':(19,'FFT'),'OSD':(20,'OSD')}
 
@@ -144,6 +145,7 @@ def pinfo(name):
     return d
 
 
+NO_SIMPLE = set()
 PTOK = re.compile(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b")
 
 out = []
@@ -164,6 +166,11 @@ for e in raw:
     if v:
         row.update(t=v["t"], c=v["c"], f=v["f"], causes=v["causes"], diag=v["diag"], more=v["more"], ignore=v["ignore"],
                    d=[kb.DOCS[k] for k in v["d"] if k in kb.DOCS], cur=1, src=v["code"])
+        sp = SIMPLE.get(v["t"])
+        if sp:
+            row.update(st=sp[0], sw=sp[1], ss=sp[2])
+        else:
+            NO_SIMPLE.add(v["t"])
         pnames = list(dict.fromkeys(v["p"]))
     else:
         row.update(t="", c="", f=[], d=[], cur=0)
@@ -178,6 +185,11 @@ for e in raw:
         row["chk"] = dict(name="ARMING_CHECK_" + ck, ru=ru, bit=bit)
     out.append(row)
 
+if NO_SIMPLE:
+    print("WARNING: нет простого текста для:", sorted(NO_SIMPLE))
+extra = sorted(set(SIMPLE) - {e["t"] for e in VERIFIED.values()})
+if extra:
+    print("WARNING: простые тексты без разбора:", extra)
 missing = sorted(set(VERIFIED) - {r["text"] for r in out})
 if missing:
     print("WARNING: проверенные ключи без сообщения в коде:", missing)
