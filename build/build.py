@@ -10,7 +10,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import kb  # noqa  (только DOCS и таблицы кодов лога / internal errors — они взяты из enum'ов исходников)
 from kb_verified import VERIFIED  # noqa
-from kb_simple import SIMPLE  # noqa
+from kb_ops import OPS  # noqa
 import validate  # noqa
 CHK_BIT = {'BARO':(1,'Барометр'),'COMPASS':(2,'Компас'),'GPS':(3,'GPS-фикс'),'INS':(4,'IMU'),'PARAMETERS':(5,'Параметры'),'RC':(6,'Каналы RC'),'VOLTAGE':(7,'Напряжение платы'),'BATTERY':(8,'Уровень батареи'),'AIRSPEED':(9,'Airspeed'),'LOGGING':(10,'Логирование'),'SWITCH':(11,'Safety switch'),'GPS_CONFIG':(12,'Конфигурация GPS'),'SYSTEM':(13,'Система'),'MISSION':(14,'Миссия'),'RANGEFINDER':(15,'Дальномер'),'CAMERA':(16,'Камера'),'AUX_AUTH':(17,'Aux-авторизация'),'VISION':(18,'Visual Odometry'),'FFT':(19,'FFT'),'OSD':(20,'OSD')}
 
@@ -26,7 +26,7 @@ PDEF_PATH = os.path.join(SRC, "apm.pdef.json")  # Tools/autotest/param_metadata/
 PDEF = validate.load_pdef(PDEF_PATH)
 bad, renamed = validate.main(PDEF_PATH)
 renamed = [r for r in renamed if not r[0].startswith(("GPS1_", "GPS2_"))]
-if bad and set(bad) - {"AP_AHRS", "AP_GPS", "ATC_RAT_RLL", "EK3_SRC", "FLTMODE_GCSBLOCK", "GPS_GLITCH", "FENCE_POINT", "FWD_THR", "INS_MAX_INSTANCES", "H_RUNUP_TIME"}:
+if bad and set(bad) - {"AP_AHRS", "AP_GPS", "ATC_RAT_RLL", "EK3_SRC", "FLTMODE_GCSBLOCK", "GPS_GLITCH", "FENCE_POINT", "FWD_THR", "INS_MAX_INSTANCES", "H_RUNUP_TIME", "PAYLOAD_PLACE"}:
     sys.exit("kb_verified ссылается на несуществующие параметры: %s" % bad)
 if renamed:
     sys.exit("kb_verified использует переименованные параметры: %s" % renamed)
@@ -166,9 +166,9 @@ for e in raw:
     if v:
         row.update(t=v["t"], c=v["c"], f=v["f"], causes=v["causes"], diag=v["diag"], more=v["more"], ignore=v["ignore"],
                    d=[kb.DOCS[k] for k in v["d"] if k in kb.DOCS], cur=1, src=v["code"])
-        sp = SIMPLE.get(v["t"])
-        if sp:
-            row.update(st=sp[0], sw=sp[1], ss=sp[2])
+        op = OPS.get(v["t"])
+        if op:
+            row.update(ops=op)
         else:
             NO_SIMPLE.add(v["t"])
         pnames = list(dict.fromkeys(v["p"]))
@@ -187,9 +187,13 @@ for e in raw:
 
 if NO_SIMPLE:
     print("WARNING: нет простого текста для:", sorted(NO_SIMPLE))
-extra = sorted(set(SIMPLE) - {e["t"] for e in VERIFIED.values()})
+extra = sorted(set(OPS) - {e["t"] for e in VERIFIED.values()})
 if extra:
     print("WARNING: простые тексты без разбора:", extra)
+# одинаковые тексты (EKF2/EKF3 и т.п.) — одна карточка; предпочитаем EKF3/ArduCopter
+out.sort(key=lambda r: ("NavEKF2" in r["file"], r["rank"]))
+_seen = set()
+out = [r for r in out if not (r["text"] in _seen or _seen.add(r["text"]))]
 missing = sorted(set(VERIFIED) - {r["text"] for r in out})
 if missing:
     print("WARNING: проверенные ключи без сообщения в коде:", missing)

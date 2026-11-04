@@ -61,6 +61,15 @@ def main(pdef_path):
                 desc = (P[ok].get("Description", "") + P[ok].get("DisplayName", ""))
                 if re.search(r"[Rr]enamed in|[Dd]eprecated|no longer used", desc):
                     renamed.append((tok, desc[:120]))
+    from kb_ops import OPS
+    for key, e in OPS.items():
+        blob = e["title"] + " " + e["what"] + " " + " ".join(c["c"] + " " + c["chk"] + " " + c["fix"] for c in e["causes"])
+        for tok in set(TOK.findall(blob)):
+            if tok in seen or any(tok.startswith(n) for n in NOT_PARAMS):
+                continue
+            seen.add(tok)
+            if not any(c in P for c in candidates(tok)):
+                bad.append(tok)
     print("UNKNOWN:", sorted(bad))
     print("RENAMED/DEPRECATED:")
     for r in renamed:
