@@ -546,8 +546,17 @@ V(["ESC calibration: Passing pilot throttle to ESCs", "ESC calibration: Auto cal
   ["Сними пропеллеры!", "Для PWM-ESC: ESC_CALIBRATION=3, перезагрузи, следуй сообщениям.", "Для DShot калибровка не нужна."], ["ESC_CALIBRATION"], ["motors"], code="ArduCopter/esc_calibration.cpp; значения @Param ESC_CALIBRATION")
 V(["%s: Board initialising", "%s: RC not calibrated", "%s: vehicle not landed", "%s: Safety switch", "%s: Motor Emergency Stopped"], "Мотор-тест / CompassMot не может стартовать",
   "Проверки перед тестом моторов: плата инициализирована, RC откалиброван, коптер на земле, safety switch нажат, нет E-Stop.", ["Выполни условие из текста.", "Пропеллеры сними!"], [], ["mdisc"], code="ArduCopter/motor_test.cpp, mavlink_motor_control_check()")
-V(["Compass disabled", "Check compass", "RC not calibrated", "Throttle not zero", "Not landed"], "CompassMot не может стартовать", "Проверки compassmot.cpp: компас включён и здоров, пульт откалиброван, газ 0, коптер на земле.",
-  ["Выполни условие.", "Снять пропеллеры? Нет — для CompassMot пропеллеры нужны, коптер надёжно закрепи."], [], ["compassmot"], code="ArduCopter/compassmot.cpp")
+CMOT = "ArduCopter/compassmot.cpp, mavlink_compassmot()"
+V("Compass disabled", "CompassMot: нет ни одного компаса", "Калибровка влияния моторов на компас (CompassMot) запущена, но в системе нет доступного компаса (compass.available() = false): компасы выключены или не найдены.",
+  ["Включи компас: COMPASS_ENABLE=1, COMPASS_USE=1.", "Проверь, что компас обнаружен (Setup → Compass), перезагрузи."], ["COMPASS_ENABLE", "COMPASS_USE"], ["compassmot"], code=CMOT)
+V("Check compass", "CompassMot: компас нездоров", "Один из компасов не отдаёт данные (compass.healthy() = false) — CompassMot не запускается.",
+  ["Проверь подключение внешнего компаса (I2C/CAN, питание GPS-модуля).", "Перезагрузи и убедись, что нет «PreArm: Compass not healthy»."], ["COMPASS_USE"], ["compassmot"], code=CMOT)
+V("RC not calibrated", "CompassMot: пульт не откалиброван", "Перед CompassMot проверяется калибровка пульта (те же проверки, что «radio min too high / max too low»): газом нужно будет управлять вручную.",
+  ["Сделай Radio Calibration в Mission Planner."], ["RC3_MIN", "RC3_MAX"], ["compassmot", "rc"], code=CMOT)
+V("Throttle not zero", "CompassMot: газ не на нуле", "Запуск CompassMot разрешён только при газе в нуле.",
+  ["Опусти стик газа полностью и запусти снова."], ["RC3_MIN"], ["compassmot"], code=CMOT)
+V("Not landed", "CompassMot: коптер не на земле", "Copter считает, что он не приземлён (land_complete = false) — CompassMot выполняется только на земле.",
+  ["Поставь коптер на землю, disarm, подожди пару секунд и запусти снова."], [], ["compassmot"], code=CMOT)
 V(["SmartRTL deactivated: %s", "SmartRTL deactivated: init failed"], "SmartRTL отключён в полёте", "Причины в коде: «buffer full» (точки кончились), «bad position» (нет позиции долго), «program error», «init failed» (нет памяти).",
   ["buffer full — увеличь SRTL_POINTS (до 500).", "bad position — проблема GPS.", "init failed — освободи память."], ["SRTL_POINTS", "SRTL_ACCURACY"], ["srtl"], code="libraries/AP_SmartRTL/AP_SmartRTL.cpp")
 V("SmartRTL: lost one point", "SmartRTL потерял точку", "Не удалось сохранить точку пути при входе в SmartRTL.", ["Обычно не критично."], ["SRTL_POINTS"], ["srtl"], code="ArduCopter/mode_smart_rtl.cpp")

@@ -179,64 +179,39 @@
   function list(tag, arr) {
     return "<" + tag + ">" + arr.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</" + tag + ">";
   }
-  var TAG_CODE = ' <span class="src code">из кода</span>', TAG_HAND = ' <span class="src hand">рекомендации</span>', TAG_VER = ' <span class="src hand">сверено с кодом</span>';
   function detail(m) {
     var h = "";
-    if (m.cond || m.via) {
-      h += "<h4>Когда выводится" + TAG_CODE + "</h4>";
-      if (m.cond) h += '<div class="cond"><code>' + esc(m.cond) + "</code></div>" + '<div class="note">в функции ' + esc(m.func || "?") + "(), " + esc(m.file.split("/").pop()) + ":" + m.line + "</div>";
-      if (m.via) h += '<div class="note">' + esc(m.via) + "</div>";
-    }
     if (m.cur) {
-      h += "<h4>Почему это происходит" + TAG_VER + "</h4><div>" + esc(m.c) + "</div>";
-      h += '<div class="note srcline">Сверено с исходниками ' + esc(W.tag) + ": " + esc(m.src) + "</div>";
+      h += "<h4>Возможная причина</h4><div>" + esc(m.c) + "</div>";
+      if (m.causes && m.causes.length) h += list("ul", m.causes);
+      var steps = m.f.concat(m.more || []);
+      if (steps.length) h += "<h4>Как решить</h4>" + list("ol", steps);
+      if (m.ignore) h += '<div class="note" style="margin-top:6px"><b>Можно ли игнорировать:</b> ' + esc(m.ignore) + "</div>";
     } else {
-      h += "<h4>Разбор</h4><div class=\"note\">Для этого сообщения ручной разбор не написан: оно информационное или относится не к Copter (Plane/Rover/редкое оборудование). Ниже — точное условие из кода и код целиком.</div>";
+      h += "<h4>Возможная причина</h4><div class=\"note\">Ручной разбор не написан: сообщение информационное или относится не к Copter. Условие срабатывания — в блоке ниже.</div>";
     }
-    if (m.causes && m.causes.length) h += "<h4>Типичные причины" + TAG_HAND + "</h4>" + list("ul", m.causes);
-    if (!m.cur && !m.cond) { /* нечего проверять */ }
-    h += "<h4>Как проверить</h4>";
-    if (m.diag && m.diag.length) h += list("ul", m.diag);
-    else h += list("ul", [
-      "Mission Planner: вкладка Messages — найди точный текст и что было до него.",
-      "Лог полёта (Review a Log): сообщения MSG и ERR вокруг момента ошибки.",
-      "Посмотри условие «Когда выводится» выше и код целиком (блок внизу): какой датчик или параметр сравнивается."]);
-    if (m.f.length) h += "<h4>Что делать (по порядку)" + TAG_HAND + "</h4>" + list("ol", m.f);
-    else if (!m.cur) h += "<h4>Что делать</h4><div class=\"note\">Готовых шагов нет. Разбери условие в коде, проверь связанные параметры и поищи на форуме (ссылка внизу).</div>";
-    if (m.more && m.more.length) h += "<h4>Если не помогло" + TAG_HAND + "</h4>" + list("ul", m.more);
-    if (m.chk) {
-      h += "<h4>Можно ли отключить проверку" + TAG_CODE + "</h4><div class=\"box\">В коде проверка помечена <code>" + esc(m.chk.name) + "</code> — группа <b>«" + esc(m.chk.ru) + "»</b>" +
-        (m.chk.bit ? " (бит " + m.chk.bit + " в <code>ARMING_CHECK</code>)." : ".") +
-        " <code>ARMING_CHECK=1</code> — все проверки, <code>0</code> — ни одной. Убрать только эту группу: Full Parameter List → ARMING_CHECK → сними одну галочку. " +
-        (m.ignore ? esc(m.ignore) : "Только для стенда без пропеллеров, потом найди причину.") + "</div>";
-    } else if (m.ignore) {
-      h += "<h4>Можно ли игнорировать" + TAG_HAND + "</h4><div class=\"box\">" + esc(m.ignore) + "</div>";
-    }
+    // всё техническое — в свёрнутом блоке
+    var c = "";
+    if (m.cond) c += '<div class="cond"><code>' + esc(m.cond) + "</code></div>";
+    c += '<div class="note">' + (m.gh ? '<a href="' + esc(m.gh) + '" target="_blank" rel="noopener">' + esc(m.file) + ":" + m.line + "</a>" : esc(m.file)) +
+      (m.func ? " · " + esc(m.func) + "()" : "") + "</div>";
+    if (m.via) c += '<div class="note">' + esc(m.via) + "</div>";
+    if (m.chk && m.chk.bit) c += '<div class="note">Проверка из группы «' + esc(m.chk.ru) + "» — бит " + m.chk.bit + " в ARMING_CHECK.</div>";
+    if (m.ctx) c += "<pre>" + esc(m.ctx) + "</pre>";
     if (m.p.length) {
-      h += "<h4>Связанные параметры <span class=\"src code\">описания из apm.pdef.json</span></h4>" + m.p.map(function (p) {
-        var meta = [];
-        if (p.range) meta.push("диапазон: " + p.range);
-        if (p.units) meta.push("ед.: " + p.units);
-        if (p.default !== undefined && p.default !== "") meta.push("по умолчанию: " + p.default);
+      c += m.p.map(function (p) {
         return '<div class="p"><b>' + esc(p.name) + "</b>" + (p.display ? " — " + esc(p.display) : "") +
-          (p.desc ? "<small>" + esc(p.desc.length > 420 ? p.desc.slice(0, 420) + "…" : p.desc) + "</small>" : "") +
-          (p.values ? "<small>значения: " + esc(p.values.length > 260 ? p.values.slice(0, 260) + "…" : p.values) + "</small>" : "") +
-          (meta.length ? "<small>" + esc(meta.join(" · ")) + "</small>" : "") + "</div>";
+          (p.desc ? "<small>" + esc(p.desc.length > 300 ? p.desc.slice(0, 300) + "…" : p.desc) + "</small>" : "") +
+          (p.values ? "<small>значения: " + esc(p.values.length > 220 ? p.values.slice(0, 220) + "…" : p.values) + "</small>" : "") +
+          (p.range ? "<small>диапазон: " + esc(p.range) + (p.units ? " " + esc(p.units) : "") + "</small>" : "") + "</div>";
       }).join("");
-    }
-    if (m.ctx) {
-      h += '<details class="code"><summary>Где это в коде (' + esc(W.tag) + ") — " + esc(m.file.split("/").pop()) + ":" + m.line + "</summary>";
-      h += '<div class="note">' + (m.gh ? '<a href="' + esc(m.gh) + '" target="_blank" rel="noopener">' + esc(m.file) + ":" + m.line + "</a>" : esc(m.file)) +
-        (m.func ? " · " + esc(m.func) + "()" : "") + "</div><pre>" + esc(m.ctx) + "</pre></details>";
-    } else if (m.file) {
-      h += '<h4>Источник</h4><div class="note">' + esc(m.file) + "</div>";
     }
     var links = [];
     m.d.forEach(function (d) { links.push('<a href="' + esc(d[1]) + '" target="_blank" rel="noopener">' + esc(d[0]) + "</a>"); });
     var qq = encodeURIComponent(m.text.replace(SPEC, "").replace(/\s+/g, " ").trim());
-    links.push('<a href="https://discuss.ardupilot.org/search?q=' + qq + '" target="_blank" rel="noopener">Поиск на форуме ArduPilot</a>');
-    links.push('<a href="https://ardupilot.org/copter/search.html?q=' + qq + '" target="_blank" rel="noopener">Поиск в документации</a>');
-    h += "<h4>Ссылки</h4><div class=\"links\">" + links.join("") + '<button class="cp" data-copy="' + m.id + '">Скопировать ссылку</button></div>';
+    links.push('<a href="https://discuss.ardupilot.org/search?q=' + qq + '" target="_blank" rel="noopener">Форум ArduPilot</a>');
+    c += '<div class="links">' + links.join("") + '<button class="cp" data-copy="' + m.id + '">Скопировать ссылку</button></div>';
+    h += '<details class="code"><summary>Код, параметры и ссылки</summary>' + c + "</details>";
     return h;
   }
   function render() {
