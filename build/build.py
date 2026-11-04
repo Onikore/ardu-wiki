@@ -8,12 +8,9 @@ import json, os, re, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-import kb  # noqa
-from kb_deep import DEEP  # noqa
-from kb_deep2 import DEEP2  # noqa
-for _k, _v in DEEP2.items():
-    DEEP.setdefault(_k, _v)
-USED_DEEP = set()
+import kb  # noqa  (только DOCS и таблицы кодов лога / internal errors — они взяты из enum'ов исходников)
+from kb_verified import VERIFIED  # noqa
+import validate  # noqa
 CHK_BIT = {'BARO':(1,'Барометр'),'COMPASS':(2,'Компас'),'GPS':(3,'GPS-фикс'),'INS':(4,'IMU'),'PARAMETERS':(5,'Параметры'),'RC':(6,'Каналы RC'),'VOLTAGE':(7,'Напряжение платы'),'BATTERY':(8,'Уровень батареи'),'AIRSPEED':(9,'Airspeed'),'LOGGING':(10,'Логирование'),'SWITCH':(11,'Safety switch'),'GPS_CONFIG':(12,'Конфигурация GPS'),'SYSTEM':(13,'Система'),'MISSION':(14,'Миссия'),'RANGEFINDER':(15,'Дальномер'),'CAMERA':(16,'Камера'),'AUX_AUTH':(17,'Aux-авторизация'),'VISION':(18,'Visual Odometry'),'FFT':(19,'FFT'),'OSD':(20,'OSD')}
 
 
@@ -24,7 +21,14 @@ TAG = "Copter-4.6.3"
 tmp = os.path.join(tempfile.gettempdir(), "ardu_wiki_raw.json")
 subprocess.check_call([sys.executable, "-I", os.path.join(HERE, "extract.py"), SRC, tmp])
 raw = json.load(open(tmp, encoding="utf-8"))
-pdb = json.load(open(tmp + ".params", encoding="utf-8"))
+PDEF_PATH = os.path.join(SRC, "apm.pdef.json")  # Tools/autotest/param_metadata/param_parse.py --vehicle ArduCopter --format json
+PDEF = validate.load_pdef(PDEF_PATH)
+bad, renamed = validate.main(PDEF_PATH)
+renamed = [r for r in renamed if not r[0].startswith(("GPS1_", "GPS2_"))]
+if bad and set(bad) - {"AP_AHRS", "AP_GPS", "ATC_RAT_RLL", "EK3_SRC", "FLTMODE_GCSBLOCK", "GPS_GLITCH", "FENCE_POINT", "FWD_THR", "INS_MAX_INSTANCES", "H_RUNUP_TIME"}:
+    sys.exit("kb_verified ссылается на несуществующие параметры: %s" % bad)
+if renamed:
+    sys.exit("kb_verified использует переименованные параметры: %s" % renamed)
 
 LIB_RU = {
     "ArduCopter": "Copter (ядро)", "AP_Arming": "Пре-арм проверки", "AP_Compass": "Компас", "CompassCalibrator": "Компас",
@@ -75,78 +79,6 @@ def sub_of(e):
     return "Прочее"
 
 
-PREFIX_LIB = {"COMPASS": "AP_Compass", "BATT": "AP_BattMonitor", "MOT": "AP_Motors", "GPS": "AP_GPS", "EK3": "AP_NavEKF3",
-              "EK2": "AP_NavEKF2", "INS": "AP_InertialSensor", "ARMING": "AP_Arming", "FENCE": "AC_Fence", "RNGFND1": "AP_RangeFinder",
-              "BARO": "AP_Baro", "ATC": "AC_AttitudeControl", "PSC": "AC_PosControl", "FLOW": "AP_OpticalFlow", "PRX1": "AP_Proximity",
-              "TERRAIN": "AP_Terrain", "LOG": "AP_Logger", "SERVO1": "SRV_Channel", "BRD": "AP_BoardConfig", "SRTL": "AP_SmartRTL",
-              "OA": "AC_Avoidance", "PLND": "AC_PrecLand", "SCHED": "AP_Scheduler", "CHUTE": "AP_Parachute", "ADSB": "AP_ADSB",
-              "RC1": "RC_Channel", "RC7": "RC_Channel", "RC8": "RC_Channel", "SERIAL1": "AP_SerialManager", "AHRS": "AP_AHRS",
-              "SERVO": "SRV_Channel", "EK3_SRC1": "AP_NavEKF", "RALLY": "AP_Rally", "H": "AP_Motors", "RC": "RC_Channel"}
-
-
-def lookup_param(name):
-    if name in pdb:
-        it = pdb[name][0]
-        return it
-    mm = re.match(r"^(RC|SERVO)\d+_(\w+)$", name)
-    if mm:
-        lib = "RC_Channel" if mm.group(1) == "RC" else "SRV_Channel"
-        for cand in (mm.group(2), "_" + mm.group(2)):
-            for it in pdb.get(cand, []):
-                if lib in it["file"]:
-                    return it
-    best = None
-    for pfx, lib in PREFIX_LIB.items():
-        if name.startswith(pfx + "_") or name == pfx:
-            rest = name[len(pfx):]
-            for cand in (rest, rest.lstrip("_")):
-                if cand in pdb:
-                    for it in pdb[cand]:
-                        if lib in it["file"]:
-                            return it
-            for k in pdb:
-                if rest and k == rest:
-                    for it in pdb[k]:
-                        if lib in it["file"]:
-                            return it
-    return best
-
-
-def pinfo(name):
-    it = lookup_param(name)
-    d = dict(name=name)
-    if it:
-        d.update(display=it.get("DisplayName", ""), desc=it.get("Description", ""), range=it.get("Range", ""),
-                 values=it.get("Values", ""), units=it.get("Units", ""), default=it.get("Default", ""))
-    return d
-
-
-compiled = [(re.compile(r["rx"], re.I), r) for r in kb.RULES]
-
-
-def match_rule(text):
-    """Выбирает самое специфичное правило: наибольшая длина совпавшего текста (широкие .* штрафуются)."""
-    probe = re.sub(r"%[-+ #0-9.]*(?:l|h|ll|z)?s", "X", text)
-    probe = re.sub(r"%[-+ #0-9.]*(?:l|h|ll|z)?[a-zA-Z]", "1", probe)
-    best, bs = None, -1
-    for order, (rx, r) in enumerate(compiled):
-        for t in (text, probe):
-            m = rx.search(t)
-            if not m:
-                continue
-            span = m.end() - m.start()
-            if ".*" in r["rx"]:
-                span = span * 0.5
-            if r.get("src"):
-                span += 3  # правила по коду предпочтительнее при равенстве
-            if span > bs:
-                best, bs = r, span
-    return best
-
-
-GENERIC = ("Для этого сообщения готового разбора пока нет. Ниже показано условие в исходниках (где и когда оно выводится) "
-           "и связанные параметры: сначала проверь, какое условие истинно, потом смотри лог (Mission Planner → Review a Log).")
-
 # Префикс, с которым AP_Arming показывает текст из failure_msg библиотеки (проверено по AP_Arming.cpp / ArduCopter/AP_Arming.cpp)
 FAIL_PREFIX = {
     "AP_Baro": "PreArm: Baro: ", "AP_InertialSensor": "PreArm: ", "AP_Compass": "PreArm: ", "AP_GPS": "PreArm: ",
@@ -183,14 +115,42 @@ def fix_fail_text(e):
     return pre + t, pre
 
 
+
+
+def fmt_map(m, prefix=""):
+    if not isinstance(m, dict):
+        return m or ""
+    def key(k):
+        try:
+            return float(k)
+        except ValueError:
+            return 1e9
+    return ", ".join(prefix + k + ": " + str(v) for k, v in sorted(m.items(), key=lambda kv: key(kv[0])))
+
+
+def pinfo(name):
+    d = dict(name=name)
+    x = PDEF.get(name)
+    if x is None:
+        m = re.match(r"^(.*)_(X|Y|Z)$", name)
+        if m and (m.group(1) + "_X") in PDEF:
+            x = PDEF[m.group(1) + "_X"]
+    if x:
+        rng = x.get("Range")
+        if isinstance(rng, dict):
+            rng = "%s … %s" % (rng.get("low"), rng.get("high"))
+        d.update(display=x.get("DisplayName", ""), desc=x.get("Description", ""), range=rng or "",
+                 values=fmt_map(x.get("Values")) or fmt_map(x.get("Bitmask"), "бит "), units=x.get("Units", ""))
+    return d
+
+
+PTOK = re.compile(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b")
+
 out = []
-seen_text = {}
 for e in raw:
     if e["text"] in SKIP_TEXT:
         continue
     e["text"], _pre = fix_fail_text(e)
-    r = match_rule(e["text"])
-    base = os.path.basename(e["file"])
     lib = e["file"].split("/")[1] if e["file"].startswith("libraries/") else "ArduCopter"
     row = dict(
         id=e["id"], text=e["text"], sev=e["sev"] or "INFO", sub=sub_of(e), file=e["file"], line=e["line"],
@@ -199,50 +159,28 @@ for e in raw:
         rank=(2 if lib in LOW else (0 if lib in ("ArduCopter", "AP_Arming") else 1)),
         gh=f"https://github.com/ArduPilot/ardupilot/blob/{TAG}/{e['file']}#L{e['line']}",
     )
-    if r:
-        row.update(t=r["t"], c=r["c"], f=r["f"], d=[kb.DOCS[k] for k in r["d"] if k in kb.DOCS], cur=1)
-        pnames = list(dict.fromkeys(r["p"]))
-        dp = r.get("deep") or DEEP.get(r["t"])
-        if dp:
-            USED_DEEP.add(r["t"])
-            row.update(causes=dp.get("causes", []), diag=dp.get("diag", []), f=dp.get("steps") or r["f"], more=dp.get("more", []), ignore=dp.get("ignore", ""), deep=1)
-        row["src"] = r.get("src", "")
+    v = VERIFIED.get(e["text"])
+    pnames = []
+    if v:
+        row.update(t=v["t"], c=v["c"], f=v["f"], causes=v["causes"], diag=v["diag"], more=v["more"], ignore=v["ignore"],
+                   d=[kb.DOCS[k] for k in v["d"] if k in kb.DOCS], cur=1, src=v["code"])
+        pnames = list(dict.fromkeys(v["p"]))
     else:
-        h = kb.SUB_HINTS.get(row["sub"])
-        if h:
-            row.update(t="", c=GENERIC + " Общий контекст: " + h[0], f=h[1], d=[kb.DOCS[k] for k in h[2] if k in kb.DOCS], cur=0)
-        else:
-            row.update(t="", c=GENERIC, f=[], d=[], cur=0)
-        pnames = []
-    # параметры из текста сообщения
-    for p in e.get("params", []):
-        if p["name"] not in pnames:
-            pnames.append(p["name"])
+        row.update(t="", c="", f=[], d=[], cur=0)
+    # параметры, названные прямо в тексте сообщения
+    for t in PTOK.findall(e["text"]):
+        if t in PDEF and t not in pnames:
+            pnames.append(t)
     row["p"] = [pinfo(n) for n in pnames[:10]]
     ck = e.get("chk", "")
     if ck:
         bit, ru = CHK_BIT.get(ck, (0, ck))
-        row["chk"] = dict(name="ARMING_CHECK_" + ck, ru=ru, bit=bit, val=(1 << bit) if bit else 1)
+        row["chk"] = dict(name="ARMING_CHECK_" + ck, ru=ru, bit=bit)
     out.append(row)
 
-# Виртуальные записи
-for i, (text, sev, sub, where) in enumerate([]):  # виртуальные записи убраны: всё берётся из кода
-    r = match_rule(text)
-    row = dict(id="x%03d" % i, text=text, sev=sev, sub=sub, file=where, line=0, func="", ctx="", kind="virtual", rank=0, gh="",
-               t="", c=GENERIC, f=[], d=[], cur=0, p=[])
-    if r:
-        row.update(t=r["t"], c=r["c"], f=r["f"], d=[kb.DOCS[k] for k in r["d"] if k in kb.DOCS], cur=1,
-                   p=[pinfo(n) for n in r["p"][:10]])
-        dp = DEEP.get(r["t"])
-        if dp:
-            USED_DEEP.add(r["t"])
-            row.update(causes=dp.get("causes", []), diag=dp.get("diag", []), f=dp.get("steps") or r["f"], more=dp.get("more", []), ignore=dp.get("ignore", ""), deep=1)
-    row["note"] = "Сообщение собирается из нескольких частей/форматов, поэтому в исходниках целиком не встречается."
-    out.append(row)
-
-for k in DEEP:
-    if k not in USED_DEEP:
-        print("DEEP key unused:", k)
+missing = sorted(set(VERIFIED) - {r["text"] for r in out})
+if missing:
+    print("WARNING: проверенные ключи без сообщения в коде:", missing)
 out.sort(key=lambda r: (-r["cur"], r["rank"], r["sub"], r["text"]))
 
 errs = [dict(sub=k, name=kb.ERR_SUBSYS[k], ru=kb.ERR_SUBSYS_RU[k]) for k in sorted(kb.ERR_SUBSYS)]
@@ -252,4 +190,5 @@ os.makedirs(SITE, exist_ok=True)
 with open(os.path.join(SITE, "data.js"), "w", encoding="utf-8") as f:
     f.write("window.WIKI=" + json.dumps(data, ensure_ascii=False, separators=(",", ":")) + ";")
 n_cur = sum(r["cur"] for r in out)
-print(f"entries={len(out)} curated={n_cur} ({100*n_cur//len(out)}%) size={os.path.getsize(os.path.join(SITE,'data.js'))//1024}KB")
+cop = [r for r in out if r["rank"] < 2 and r["sev"] in ("CRITICAL", "ERROR", "WARNING", "ALERT", "EMERGENCY")]
+print(f"entries={len(out)} verified={n_cur}; copter warnings/errors verified {sum(r['cur'] for r in cop)}/{len(cop)}; size={os.path.getsize(os.path.join(SITE,'data.js'))//1024}KB")

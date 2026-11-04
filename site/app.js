@@ -172,14 +172,14 @@
       '<button class="head" data-id="' + m.id + '" aria-expanded="' + open + '"><div class="line1"><span class="badge b-' + esc(m.sev) + '">' + esc(m.sev) + '</span>' +
       '<div><div class="msg">' + hl(m.text, toks) + '</div>' +
       (m.t ? '<div class="title">' + esc(m.t) + '</div>' : "") +
-      '<div class="tags"><span class="tag">' + esc(m.sub) + '</span>' + (m.cur ? '<span class="tag ok">есть разбор</span>' : "") + '</div></div></div></button>' +
+      '<div class="tags"><span class="tag">' + esc(m.sub) + '</span>' + (m.cur ? '<span class="tag ok">сверено с кодом</span>' : "") + '</div></div></div></button>' +
       '<div class="body">' + (open ? detail(m) : "") + "</div></div>";
     return html;
   }
   function list(tag, arr) {
     return "<" + tag + ">" + arr.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</" + tag + ">";
   }
-  var TAG_CODE = ' <span class="src code">из кода</span>', TAG_HAND = ' <span class="src hand">написано вручную</span>';
+  var TAG_CODE = ' <span class="src code">из кода</span>', TAG_HAND = ' <span class="src hand">по коду</span>', TAG_VER = ' <span class="src hand">сверено с кодом</span>';
   function detail(m) {
     var h = "";
     if (m.cond || m.via) {
@@ -187,17 +187,22 @@
       if (m.cond) h += '<div class="cond"><code>' + esc(m.cond) + "</code></div>" + '<div class="note">в функции ' + esc(m.func || "?") + "(), " + esc(m.file.split("/").pop()) + ":" + m.line + "</div>";
       if (m.via) h += '<div class="note">' + esc(m.via) + "</div>";
     }
-    h += "<h4>Почему это происходит" + (m.cur ? TAG_HAND : "") + "</h4><div>" + esc(m.c) + "</div>";
-    if (m.cur) h += '<div class="note srcline">' + (m.src ? "Объяснение составлено по коду: " + esc(m.src) + "." : "Объяснение по документации ArduPilot и практике, не сверено построчно с кодом — проверь по условию выше.") + "</div>";
+    if (m.cur) {
+      h += "<h4>Почему это происходит" + TAG_VER + "</h4><div>" + esc(m.c) + "</div>";
+      h += '<div class="note srcline">Сверено с исходниками ' + esc(W.tag) + ": " + esc(m.src) + "</div>";
+    } else {
+      h += "<h4>Разбор</h4><div class=\"note\">Для этого сообщения ручной разбор не написан: оно информационное или относится не к Copter (Plane/Rover/редкое оборудование). Ниже — точное условие из кода и код целиком.</div>";
+    }
     if (m.causes && m.causes.length) h += "<h4>Типичные причины" + TAG_HAND + "</h4>" + list("ul", m.causes);
-    h += "<h4>Как проверить" + (m.diag && m.diag.length ? TAG_HAND : "") + "</h4>";
+    if (!m.cur && !m.cond) { /* нечего проверять */ }
+    h += "<h4>Как проверить</h4>";
     if (m.diag && m.diag.length) h += list("ul", m.diag);
     else h += list("ul", [
       "Mission Planner: вкладка Messages — найди точный текст и что было до него.",
       "Лог полёта (Review a Log): сообщения MSG и ERR вокруг момента ошибки.",
       "Посмотри условие «Когда выводится» выше и код целиком (блок внизу): какой датчик или параметр сравнивается."]);
     if (m.f.length) h += "<h4>Что делать (по порядку)" + TAG_HAND + "</h4>" + list("ol", m.f);
-    else h += "<h4>Что делать</h4><div class=\"note\">Готовых шагов нет. Разбери условие в коде, проверь связанные параметры и поищи на форуме (ссылка внизу).</div>";
+    else if (!m.cur) h += "<h4>Что делать</h4><div class=\"note\">Готовых шагов нет. Разбери условие в коде, проверь связанные параметры и поищи на форуме (ссылка внизу).</div>";
     if (m.more && m.more.length) h += "<h4>Если не помогло" + TAG_HAND + "</h4>" + list("ul", m.more);
     if (m.chk) {
       h += "<h4>Можно ли отключить проверку" + TAG_CODE + "</h4><div class=\"box\">В коде проверка помечена <code>" + esc(m.chk.name) + "</code> — группа <b>«" + esc(m.chk.ru) + "»</b>" +
@@ -208,7 +213,7 @@
       h += "<h4>Можно ли игнорировать" + TAG_HAND + "</h4><div class=\"box\">" + esc(m.ignore) + "</div>";
     }
     if (m.p.length) {
-      h += "<h4>Связанные параметры <span class=\"src code\">описания из кода</span></h4>" + m.p.map(function (p) {
+      h += "<h4>Связанные параметры <span class=\"src code\">описания из apm.pdef.json</span></h4>" + m.p.map(function (p) {
         var meta = [];
         if (p.range) meta.push("диапазон: " + p.range);
         if (p.units) meta.push("ед.: " + p.units);
@@ -348,6 +353,6 @@
   /* ---------- stats ---------- */
   var nc = M.filter(function (m) { return m.cur; }).length;
   var np = M.filter(function (m) { return /^PreArm|^Arm:/.test(m.text); }).length;
-  $("#stats").innerHTML = [[M.length, "сообщений в базе"], [nc, "с готовым разбором"], [np, "PreArm-проверок"], [Object.keys(subs).length, "подсистем"]]
+  $("#stats").innerHTML = [[M.length, "сообщений в базе"], [nc, "сверено с кодом"], [np, "PreArm-проверок"], [Object.keys(subs).length, "подсистем"]]
     .map(function (x) { return '<div class="stat"><b>' + x[0] + "</b><span>" + x[1] + "</span></div>"; }).join("");
 })();

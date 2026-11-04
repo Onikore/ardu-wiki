@@ -223,7 +223,7 @@ def main():
             if rel.startswith("libraries/") and any(x in rel for x in ("/examples/", "/tests/", "AP_HAL_")):
                 continue
             src = read(p)
-            if not re.search(r"GCS_SEND_TEXT|send_text|check_failed|failure_msg|fail_msg|report_failure|prearm_fail_string|temp_buffer|update_check|announce_failsafe", src):
+            if not re.search(r"GCS_SEND_TEXT|send_text|check_failed|failure_msg|fail_msg|report_failure|prearm_fail_string|temp_buffer|update_check|announce_failsafe|snprintf", src):
                 continue
             idx = build_line_index(src)
             lines = src.split("\n")
@@ -315,6 +315,11 @@ def main():
                 if not fmt or len(fmt.strip()) < 3:
                     continue
                 ln = line_of(idx, m.start())
+                # буферы с общими именами (buffer/msg) берём только из функций проверок
+                if m.group(1) not in ("failure_msg", "fail_msg", "prearm_fail_string", "failure_message"):
+                    fnl = enclosing_func(lines, ln).lower()
+                    if not any(w in fnl for w in ("arm", "check", "fail", "health")):
+                        continue
                 ctxs = max(0, ln - 9)
                 ctx = "\n".join(l.rstrip() for l in lines[ctxs:min(len(lines), ln + 2)])
                 rest = []

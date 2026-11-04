@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ArduCopter Error Wiki</title>
 <meta name="description" content="Поиск по сообщениям и ошибкам ArduCopter 4.6.3 с причинами и решениями. Данные вытащены из исходников ArduPilot.">
-<link rel="stylesheet" href="style.css?v=1793818056">
+<link rel="stylesheet" href="style.css?v=1793819279">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%F0%9F%9A%81%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -36,7 +36,7 @@
   <div class="filters">
     <div class="sevs" id="sevs"></div>
     <select id="sub" aria-label="Подсистема"><option value="">Все подсистемы</option></select>
-    <label class="chk"><input type="checkbox" id="onlyCur"> только с разбором</label>
+    <label class="chk"><input type="checkbox" id="onlyCur"> только сверенные с кодом</label>
     <label class="chk"><input type="checkbox" id="onlyCopter" checked> актуально для Copter</label>
   </div>
   <div class="meta" id="meta"></div>
@@ -70,19 +70,18 @@
 <section id="tab-about" class="pane">
   <h2>О проекте</h2>
   <div class="card prose">
-    <p>Справочник собран автоматически из исходников <b id="a-tag"></b> (<a href="https://github.com/ArduPilot/ardupilot" target="_blank" rel="noopener">github.com/ArduPilot/ardupilot</a>): все вызовы <code>GCS_SEND_TEXT</code>, <code>send_text</code>, <code>check_failed</code> и сообщения проверок (<code>failure_msg</code>) в <code>ArduCopter/</code> и <code>libraries/</code>.</p>
-    <p>Для каждого сообщения показаны: шаблон текста (<code>%u</code>, <code>%s</code> — подставляемые значения), файл и строка в исходниках, фрагмент кода с условием срабатывания и параметры, которые упоминаются рядом, вместе с описаниями из исходников.</p>
-    <p><b>Причины и шаги решения</b> написаны вручную по документации и коду. Там, где разбора пока нет, показано условие из кода и общая подсказка по подсистеме: именно оно говорит, почему сообщение появилось.</p>
-    <p>Всегда сверяйся с логом полёта и официальной документацией: <a href="https://ardupilot.org/copter/" target="_blank" rel="noopener">ardupilot.org/copter</a>, форум <a href="https://discuss.ardupilot.org/" target="_blank" rel="noopener">discuss.ardupilot.org</a>.</p>
+    <p>Справочник собран из исходников <b id="a-tag"></b> (<a href="https://github.com/ArduPilot/ardupilot" target="_blank" rel="noopener">github.com/ArduPilot/ardupilot</a>). Тексты сообщений берутся автоматически из вызовов <code>GCS_SEND_TEXT</code>, <code>send_text</code>, <code>check_failed</code> и pre-arm проверок библиотек (с тем префиксом <code>PreArm: …</code>, который реально добавляет прошивка), а строковые константы подставляются из кода.</p>
+    <p><b>Из кода (автоматически):</b> текст сообщения, файл и строка, условие <code>if (…)</code>, при котором оно выводится, бит <code>ARMING_CHECK</code>. Описания, диапазоны и значения параметров взяты из официальной базы параметров Copter (<code>apm.pdef.json</code>, генератор ArduPilot <code>param_parse.py</code>).</p>
+    <p><b>Сверено с кодом:</b> причины и шаги для всех предупреждений и ошибок, актуальных для Copter, написаны вручную по коду этой версии: пороги, условия и значения параметров взяты из исходников. Под каждым разбором указана функция, по которой он написан. Все упомянутые параметры при сборке автоматически проверяются: существуют ли они в 4.6.3 и не переименованы ли.</p>
+    <p>Информационные сообщения и сообщения других типов аппаратов показаны без ручного разбора: только условие из кода.</p>
     <p class="warn">⚠ Отключение проверок (<code>ARMING_CHECK</code>, failsafe) убирает защиту. Используй только для стендовых тестов без пропеллеров.</p>
-    <p>Обновление данных под новую версию: <code>python build/build.py src/ap site</code> (см. README в репозитории).</p>
-  </div>
+    <p>Обновление под новую версию прошивки описано в README репозитория.</div>
   <div class="stats" id="stats"></div>
 </section>
 </main>
 
 <footer class="wrap foot">Данные: ArduPilot (GPLv3), <span id="f-tag"></span> · не официальный ресурс ArduPilot</footer>
-<script src="data.js?v=1793818056"></script>
-<script src="app.js?v=1793818056"></script>
+<script src="data.js?v=1793819279"></script>
+<script src="app.js?v=1793819279"></script>
 </body>
 </html>
