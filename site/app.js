@@ -179,7 +179,7 @@
   function list(tag, arr) {
     return "<" + tag + ">" + arr.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</" + tag + ">";
   }
-  var TAG_CODE = ' <span class="src code">из кода</span>', TAG_HAND = ' <span class="src hand">по коду</span>', TAG_VER = ' <span class="src hand">сверено с кодом</span>';
+  var TAG_CODE = ' <span class="src code">из кода</span>', TAG_HAND = ' <span class="src hand">рекомендации</span>', TAG_VER = ' <span class="src hand">сверено с кодом</span>';
   function detail(m) {
     var h = "";
     if (m.cond || m.via) {
