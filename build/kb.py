@@ -139,14 +139,14 @@ R(r"PreArm: GCS failsafe on", "Активен GCS failsafe", "GCS был под�
 R(r"PreArm: (AHRS|Compass) not healthy", "AHRS/компас нездоров", "Датчик/фильтр не отдаёт данные.", ["Проверь шлейф/пайку/I2C, перезагрузи, посмотри другие сообщения.", "Для компаса: COMPASS_USE/ENABLE, внешний компас по I2C/CAN подключён."], ["COMPASS_USE", "COMPASS_USE2", "COMPASS_USE3"], ["compcal"])
 R(r"PreArm: .* mode not armable", "Режим нельзя armить", "Текущий режим в данной конфигурации недоступен для arm (нет GPS, миссии и пр.).", ["Переключись в Stabilize/AltHold и arm, либо выполни требования режима."], ["ARMING_CHECK"], ["modes"])
 R(r"PreArm: Leaning", "Коптер наклонён", "Угол наклона слишком большой для arm.", ["Поставь коптер ровно, перекалибруй акселерометр (level).", "AHRS_TRIM_X/Y при необходимости."], ["AHRS_TRIM_X", "AHRS_TRIM_Y"], ["acccal"])
-R(r"PreArm: .* too high", "Стик/канал слишком высоко", "Стик газа или другой канал находится выше разрешённого.", ["Опусти стик газа до нуля.", "Проверь калибровку пульта."], ["RC3_MIN"], ["rc"])
+R(r"PreArm: (X|%s|\w+ \(RC\d+\)) too high", "Стик/канал слишком высоко", "Стик газа или другой канал находится выше разрешённого.", ["Опусти стик газа до нуля.", "Проверь калибровку пульта."], ["RC3_MIN"], ["rc"])
 R(r"PreArm: (Hardware )?[Ss]afety [Ss]witch", "Не нажат safety switch", "Аппаратный выключатель безопасности не подтверждён (быстро мигающий красный светодиод).", ["Нажми и удерживай кнопку safety на GPS ~1–2 с.", "Нет кнопки: BRD_SAFETY_DEFLT=0 (BRD_SAFETYENABLE=0 в старых версиях)."], ["BRD_SAFETY_DEFLT", "BRD_SAFETYOPTION"], ["safety"])
 R(r"PreArm: Disarm Switch on", "Включён тумблер Disarm", "Аукс-функция Arm/Disarm (153) в положении disarm.", ["Переключи тумблер."], [], [])
 # --- Compass
 R(r"PreArm: Compass calibration running", "Идёт калибровка компаса", "Калибровка не завершена.", ["Закончи или отмени калибровку."], [], ["compcal"])
 R(r"PreArm: Compass calibrated requires reboot|Compass order change requires reboot|Compass cal requires reboot", "Компас откалиброван — нужна перезагрузка", "После калибровки/смены приоритета нужна перезагрузка.", ["Перезагрузи автопилот."], ["COMPASS_PRIO1_ID"], ["compcal"])
 R(r"PreArm: Compass offsets too high", "Слишком большие оффсеты компаса",
-  "Модуль смещений > COMPASS_OFFS_MAX (1500 по умолчанию) — рядом сильный магнитный источник.",
+  "Модуль смещений > COMPASS_OFFS_MAX (1800 по умолчанию) — рядом сильный магнитный источник.",
   ["Отодвинь компас от силовых проводов, моторов, батареи; ставь GPS-мачту.", "Перекалибруй компас вдали от металла.", "Внутренний компас на плате обычно неюзабелен на мелком коптере — используй внешний."],
   ["COMPASS_OFFS_MAX", "COMPASS_USE", "COMPASS_EXTERNAL"], ["compcal"])
 R(r"PreArm: Check mag field", "Магнитное поле не соответствует модели Земли",
@@ -244,7 +244,7 @@ R(r"EKF[23] refusing set origin|origin already set", "EKF: origin уже зад�
 R(r"Radio Failsafe Cleared|GCS Failsafe Cleared|Glitch cleared", "Failsafe снят", "Условие failsafe пропало.", ["Ничего не нужно."], [], ["fs"])
 R(r"^Radio Failsafe|Radio Failsafe -|Radio Failsafe$", "Радио failsafe", "Потеряна связь с пультом либо газ ниже FS_THR_VALUE.", ["Проверь приёмник, антенны, дальность и настройку failsafe в пульте.", "FS_THR_ENABLE выбирает действие (RTL/Land/SmartRTL)."], ["FS_THR_ENABLE", "FS_THR_VALUE"], ["fsradio"])
 R(r"^GCS Failsafe|GCS Failsafe -", "GCS failsafe", "Потеряна связь с наземной станцией.", ["Проверь телеметрию; FS_GCS_ENABLE, FS_GCS_TIMEOUT."], ["FS_GCS_ENABLE", "FS_GCS_TIMEOUT"], ["fsgcs"])
-R(r"^(Battery|Low Battery|Critical Battery)|Battery Failsafe|Battery \d+ is (low|critical)", "Батарея разряжена (failsafe)", "Напряжение или ёмкость упали ниже порогов BATT_LOW_*/BATT_CRT_*.", ["Немедленно садись или дай автопилоту выполнить BATT_FS_LOW_ACT/BATT_FS_CRT_ACT.", "Проверь калибровку BATT_VOLT_MULT и просадки напряжения под нагрузкой."], ["BATT_LOW_VOLT", "BATT_CRT_VOLT", "BATT_FS_LOW_ACT", "BATT_FS_CRT_ACT", "BATT_VOLT_MULT"], ["fsbatt"])
+R(r"^Battery Failsafe|\+ Battery Failsafe|^Battery %d is %s|^Battery \d+ is (low|critical)", "Батарея разряжена (failsafe)", "Напряжение или ёмкость упали ниже порогов BATT_LOW_*/BATT_CRT_*.", ["Немедленно садись или дай автопилоту выполнить BATT_FS_LOW_ACT/BATT_FS_CRT_ACT.", "Проверь калибровку BATT_VOLT_MULT и просадки напряжения под нагрузкой."], ["BATT_LOW_VOLT", "BATT_CRT_VOLT", "BATT_FS_LOW_ACT", "BATT_FS_CRT_ACT", "BATT_VOLT_MULT"], ["fsbatt"])
 R(r"Failsafe: Terrain data missing|Restarting RTL - Terrain data missing", "Нет terrain в RTL", "RTL с terrain, а данных нет.", ["Загрузи terrain, RTL_ALT_TYPE=0 для отказа от terrain."], ["RTL_ALT_TYPE", "TERRAIN_ENABLE"], ["terrain"])
 R(r"GPS Glitch or Compass error", "GPS глитч или ошибка компаса", "Flag GPS glitch/compass error во время полёта.", ["Проверь EKF, помехи компасу, GPS."], [], ["ekf"])
 R(r"SmartRTL Unavailable|SmartRTL deactivated|SmartRTL: lost one point", "SmartRTL недоступен", "Нет достаточно точек пути/память переполнена/GPS потерян.", ["Взлетай с хорошим GPS; SRTL_POINTS/ACCURACY."], ["SRTL_POINTS", "SRTL_ACCURACY"], ["srtl"])
@@ -259,7 +259,7 @@ R(r"PRX\d+: (No Data|Not Connected)|Configure PRX", "Proximity", "Датчик �
 R(r"OA requires reboot|Dijkstra|BendyRuler", "Object Avoidance", "Для смены типа OA нужна перезагрузка или нет данных.", ["Перезагрузи; OA_TYPE, настройки Fence/Proximity."], ["OA_TYPE"], ["oa"])
 R(r"PrecLand", "Precision Landing", "Цель потеряна или не инициализирован PrecLand.", ["PLND_ENABLED, PLND_TYPE, калибровка IR-Lock/камеры."], ["PLND_ENABLED", "PLND_TYPE"], ["prec"])
 R(r"FlowCal|OptFlow|Optical", "Optical flow", "Не найден оптфлоу или калибровка не удалась.", ["FLOW_TYPE, ориентация FLOW_ORIENT_YAW, высота и освещённость."], ["FLOW_TYPE", "FLOW_ORIENT_YAW"], ["flow"])
-R(r"AutoTune", "AutoTune не удался", "Слишком вибрации/ветер/неверный начальный PID/недостаточно места.", ["Проверь вибрации, лети в штиль, начальные AUTOTUNE_AGGR 0.075.", "Если «Failed to level» — настрой руками."], ["AUTOTUNE_AXES", "AUTOTUNE_AGGR"], ["autotune", "tune"])
+R(r"AutoTune", "AutoTune: ход процесса", "Служебные сообщения AutoTune о текущей фазе и найденных коэффициентах (не ошибка).", ["Дождись «AutoTune: Success», затем приземлись в режиме AutoTune (переключатель оставь включённым) и disarm — так коэффициенты сохранятся."], ["AUTOTUNE_AXES", "AUTOTUNE_AGGR"], ["autotune"])
 R(r"must be (>|<|>=) ?0|_POS[XYZ]_P must|_VEL[XYZ]_P|_ACCZ_[PI]", "Недопустимый PID/PosControl параметр", "Один из PID-параметров равен 0 или отрицательный.", ["Проверь указанные ATC_*/PSC_* и верни к дефолтам."], ["PSC_POSXY_P", "PSC_POSZ_P", "PSC_VELZ_P", "PSC_ACCZ_P"], ["tune"])
 R(r"Motor ?Test|motor test|^%s: (Board initialising|RC not calibrated|vehicle not landed|Safety switch)|Motor Emergency", "Мотор-тест / Compass-Mot отказ", "Тест не может начаться: не armed/не выбрана рама/safety switch/газ.", ["Убери safety switch, откалибруй RC, поставь на землю."], ["MOT_SPIN_ARM"], ["mdisc"])
 R(r"ESC calibration|ESC cal", "ESC калибровка", "Неверная последовательность калибровки.", ["Следуй процедуре ESC calibration (ESC_CALIBRATION=3 или Mission Planner)."], ["ESC_CALIBRATION"], ["motors"])
@@ -364,3 +364,5 @@ SUB_HINTS = {}
 from kb_more import *  # noqa
 import kb_more
 SUB_HINTS = kb_more.SUB_HINTS
+
+import kb_code  # noqa  (правила по коду, вставляются в начало)

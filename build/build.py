@@ -9,6 +9,13 @@ import json, os, re, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import kb  # noqa
+from kb_deep import DEEP  # noqa
+from kb_deep2 import DEEP2  # noqa
+for _k, _v in DEEP2.items():
+    DEEP.setdefault(_k, _v)
+USED_DEEP = set()
+CHK_BIT = {'BARO':(1,'Барометр'),'COMPASS':(2,'Компас'),'GPS':(3,'GPS-фикс'),'INS':(4,'IMU'),'PARAMETERS':(5,'Параметры'),'RC':(6,'Каналы RC'),'VOLTAGE':(7,'Напряжение платы'),'BATTERY':(8,'Уровень батареи'),'AIRSPEED':(9,'Airspeed'),'LOGGING':(10,'Логирование'),'SWITCH':(11,'Safety switch'),'GPS_CONFIG':(12,'Конфигурация GPS'),'SYSTEM':(13,'Система'),'MISSION':(14,'Миссия'),'RANGEFINDER':(15,'Дальномер'),'CAMERA':(16,'Камера'),'AUX_AUTH':(17,'Aux-авторизация'),'VISION':(18,'Visual Odometry'),'FFT':(19,'FFT'),'OSD':(20,'OSD')}
+
 
 SRC = sys.argv[1]
 SITE = sys.argv[2]
@@ -81,6 +88,13 @@ def lookup_param(name):
     if name in pdb:
         it = pdb[name][0]
         return it
+    mm = re.match(r"^(RC|SERVO)\d+_(\w+)$", name)
+    if mm:
+        lib = "RC_Channel" if mm.group(1) == "RC" else "SRV_Channel"
+        for cand in (mm.group(2), "_" + mm.group(2)):
+            for it in pdb.get(cand, []):
+                if lib in it["file"]:
+                    return it
     best = None
     for pfx, lib in PREFIX_LIB.items():
         if name.startswith(pfx + "_") or name == pfx:
@@ -111,32 +125,88 @@ compiled = [(re.compile(r["rx"], re.I), r) for r in kb.RULES]
 
 
 def match_rule(text):
+    """Выбирает самое специфичное правило: наибольшая длина совпавшего текста (широкие .* штрафуются)."""
     probe = re.sub(r"%[-+ #0-9.]*(?:l|h|ll|z)?s", "X", text)
     probe = re.sub(r"%[-+ #0-9.]*(?:l|h|ll|z)?[a-zA-Z]", "1", probe)
-    for rx, r in compiled:
-        if rx.search(text) or rx.search(probe):
-            return r
-    return None
+    best, bs = None, -1
+    for order, (rx, r) in enumerate(compiled):
+        for t in (text, probe):
+            m = rx.search(t)
+            if not m:
+                continue
+            span = m.end() - m.start()
+            if ".*" in r["rx"]:
+                span = span * 0.5
+            if r.get("src"):
+                span += 3  # правила по коду предпочтительнее при равенстве
+            if span > bs:
+                best, bs = r, span
+    return best
 
 
 GENERIC = ("Для этого сообщения готового разбора пока нет. Ниже показано условие в исходниках (где и когда оно выводится) "
            "и связанные параметры: сначала проверь, какое условие истинно, потом смотри лог (Mission Planner → Review a Log).")
 
+# Префикс, с которым AP_Arming показывает текст из failure_msg библиотеки (проверено по AP_Arming.cpp / ArduCopter/AP_Arming.cpp)
+FAIL_PREFIX = {
+    "AP_Baro": "PreArm: Baro: ", "AP_InertialSensor": "PreArm: ", "AP_Compass": "PreArm: ", "AP_GPS": "PreArm: ",
+    "AP_BattMonitor": "PreArm: ", "AP_RangeFinder": "PreArm: ", "AP_Motors": "PreArm: Motors: ",
+    "AC_AttitudeControl": "PreArm: Bad parameter: ", "AP_AHRS": "PreArm: AHRS: ", "AP_NavEKF3": "PreArm: AHRS: ",
+    "AP_NavEKF2": "PreArm: AHRS: ", "AP_NavEKF": "PreArm: AHRS: ", "AP_VisualOdom": "PreArm: VisOdom: ",
+    "AP_DroneCAN": "PreArm: DroneCAN: ", "AP_Mount": "PreArm: Mount: ", "AP_Generator": "PreArm: Generator: ",
+    "AP_OpenDroneID": "PreArm: OpenDroneID: ", "AP_FETtecOneWire": "PreArm: FETtec: ",
+}
+SKIP_TEXT = {"%s Failsafe", "%s Failsafe - %s"}
+
+
+def fix_fail_text(e):
+    if e["kind"] != "fail" or not e["file"].startswith("libraries/"):
+        return e["text"], ""
+    lib = e["file"].split("/")[1]
+    fn = (e.get("func") or "").lower()
+    buf = e.get("buf", "failure_msg")
+    is_prearm = buf in ("failure_msg", "fail_msg", "prearm_fail_string", "temp_buffer") or "arm" in fn or "check" in fn
+    if not is_prearm:
+        return e["text"], ""
+    pre = FAIL_PREFIX.get(lib)
+    if pre is None:
+        return e["text"], ""
+    t = e["text"]
+    if lib == "AC_AttitudeControl":
+        t = re.sub(r"^%s_", "PSC_" if "PosControl" in e["file"] else "ATC_", t)
+    if lib == "AP_BattMonitor" and not t.startswith("Battery"):
+        t = "Battery %d " + t
+    if lib == "AP_Motors":
+        t = t.replace("%sSPIN", "MOT_SPIN").replace("%sPWM", "MOT_PWM")
+    if t.startswith(pre.strip()):
+        return t, pre
+    return pre + t, pre
+
+
 out = []
 seen_text = {}
 for e in raw:
+    if e["text"] in SKIP_TEXT:
+        continue
+    e["text"], _pre = fix_fail_text(e)
     r = match_rule(e["text"])
     base = os.path.basename(e["file"])
     lib = e["file"].split("/")[1] if e["file"].startswith("libraries/") else "ArduCopter"
     row = dict(
         id=e["id"], text=e["text"], sev=e["sev"] or "INFO", sub=sub_of(e), file=e["file"], line=e["line"],
-        func=e["func"], ctx=e["ctx"], kind=e["kind"],
+        func=e["func"], ctx=e["ctx"], kind=e["kind"], cond=e.get("cond", ""),
+        via=("Текст формируется в библиотеке и выводится проверкой AP_Arming с префиксом «" + _pre.strip() + "»." if _pre else ""),
         rank=(2 if lib in LOW else (0 if lib in ("ArduCopter", "AP_Arming") else 1)),
         gh=f"https://github.com/ArduPilot/ardupilot/blob/{TAG}/{e['file']}#L{e['line']}",
     )
     if r:
         row.update(t=r["t"], c=r["c"], f=r["f"], d=[kb.DOCS[k] for k in r["d"] if k in kb.DOCS], cur=1)
         pnames = list(dict.fromkeys(r["p"]))
+        dp = r.get("deep") or DEEP.get(r["t"])
+        if dp:
+            USED_DEEP.add(r["t"])
+            row.update(causes=dp.get("causes", []), diag=dp.get("diag", []), f=dp.get("steps") or r["f"], more=dp.get("more", []), ignore=dp.get("ignore", ""), deep=1)
+        row["src"] = r.get("src", "")
     else:
         h = kb.SUB_HINTS.get(row["sub"])
         if h:
@@ -149,19 +219,30 @@ for e in raw:
         if p["name"] not in pnames:
             pnames.append(p["name"])
     row["p"] = [pinfo(n) for n in pnames[:10]]
+    ck = e.get("chk", "")
+    if ck:
+        bit, ru = CHK_BIT.get(ck, (0, ck))
+        row["chk"] = dict(name="ARMING_CHECK_" + ck, ru=ru, bit=bit, val=(1 << bit) if bit else 1)
     out.append(row)
 
 # Виртуальные записи
-for i, (text, sev, sub, where) in enumerate(kb.EXTRA):
+for i, (text, sev, sub, where) in enumerate([]):  # виртуальные записи убраны: всё берётся из кода
     r = match_rule(text)
     row = dict(id="x%03d" % i, text=text, sev=sev, sub=sub, file=where, line=0, func="", ctx="", kind="virtual", rank=0, gh="",
                t="", c=GENERIC, f=[], d=[], cur=0, p=[])
     if r:
         row.update(t=r["t"], c=r["c"], f=r["f"], d=[kb.DOCS[k] for k in r["d"] if k in kb.DOCS], cur=1,
                    p=[pinfo(n) for n in r["p"][:10]])
+        dp = DEEP.get(r["t"])
+        if dp:
+            USED_DEEP.add(r["t"])
+            row.update(causes=dp.get("causes", []), diag=dp.get("diag", []), f=dp.get("steps") or r["f"], more=dp.get("more", []), ignore=dp.get("ignore", ""), deep=1)
     row["note"] = "Сообщение собирается из нескольких частей/форматов, поэтому в исходниках целиком не встречается."
     out.append(row)
 
+for k in DEEP:
+    if k not in USED_DEEP:
+        print("DEEP key unused:", k)
 out.sort(key=lambda r: (-r["cur"], r["rank"], r["sub"], r["text"]))
 
 errs = [dict(sub=k, name=kb.ERR_SUBSYS[k], ru=kb.ERR_SUBSYS_RU[k]) for k in sorted(kb.ERR_SUBSYS)]

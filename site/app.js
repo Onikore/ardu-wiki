@@ -176,13 +176,39 @@
       '<div class="body">' + (open ? detail(m) : "") + "</div></div>";
     return html;
   }
+  function list(tag, arr) {
+    return "<" + tag + ">" + arr.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</" + tag + ">";
+  }
+  var TAG_CODE = ' <span class="src code">из кода</span>', TAG_HAND = ' <span class="src hand">написано вручную</span>';
   function detail(m) {
     var h = "";
-    h += "<h4>Почему это происходит</h4><div>" + esc(m.c) + "</div>";
-    if (m.note) h += '<div class="note" style="margin-top:6px">' + esc(m.note) + "</div>";
-    if (m.f.length) h += "<h4>Что делать</h4><ol>" + m.f.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ol>";
+    if (m.cond || m.via) {
+      h += "<h4>Когда выводится" + TAG_CODE + "</h4>";
+      if (m.cond) h += '<div class="cond"><code>' + esc(m.cond) + "</code></div>" + '<div class="note">в функции ' + esc(m.func || "?") + "(), " + esc(m.file.split("/").pop()) + ":" + m.line + "</div>";
+      if (m.via) h += '<div class="note">' + esc(m.via) + "</div>";
+    }
+    h += "<h4>Почему это происходит" + (m.cur ? TAG_HAND : "") + "</h4><div>" + esc(m.c) + "</div>";
+    if (m.cur) h += '<div class="note srcline">' + (m.src ? "Объяснение составлено по коду: " + esc(m.src) + "." : "Объяснение по документации ArduPilot и практике, не сверено построчно с кодом — проверь по условию выше.") + "</div>";
+    if (m.causes && m.causes.length) h += "<h4>Типичные причины" + TAG_HAND + "</h4>" + list("ul", m.causes);
+    h += "<h4>Как проверить" + (m.diag && m.diag.length ? TAG_HAND : "") + "</h4>";
+    if (m.diag && m.diag.length) h += list("ul", m.diag);
+    else h += list("ul", [
+      "Mission Planner: вкладка Messages — найди точный текст и что было до него.",
+      "Лог полёта (Review a Log): сообщения MSG и ERR вокруг момента ошибки.",
+      "Посмотри условие «Когда выводится» выше и код целиком (блок внизу): какой датчик или параметр сравнивается."]);
+    if (m.f.length) h += "<h4>Что делать (по порядку)" + TAG_HAND + "</h4>" + list("ol", m.f);
+    else h += "<h4>Что делать</h4><div class=\"note\">Готовых шагов нет. Разбери условие в коде, проверь связанные параметры и поищи на форуме (ссылка внизу).</div>";
+    if (m.more && m.more.length) h += "<h4>Если не помогло" + TAG_HAND + "</h4>" + list("ul", m.more);
+    if (m.chk) {
+      h += "<h4>Можно ли отключить проверку" + TAG_CODE + "</h4><div class=\"box\">В коде проверка помечена <code>" + esc(m.chk.name) + "</code> — группа <b>«" + esc(m.chk.ru) + "»</b>" +
+        (m.chk.bit ? " (бит " + m.chk.bit + " в <code>ARMING_CHECK</code>)." : ".") +
+        " <code>ARMING_CHECK=1</code> — все проверки, <code>0</code> — ни одной. Убрать только эту группу: Full Parameter List → ARMING_CHECK → сними одну галочку. " +
+        (m.ignore ? esc(m.ignore) : "Только для стенда без пропеллеров, потом найди причину.") + "</div>";
+    } else if (m.ignore) {
+      h += "<h4>Можно ли игнорировать" + TAG_HAND + "</h4><div class=\"box\">" + esc(m.ignore) + "</div>";
+    }
     if (m.p.length) {
-      h += "<h4>Связанные параметры</h4>" + m.p.map(function (p) {
+      h += "<h4>Связанные параметры <span class=\"src code\">описания из кода</span></h4>" + m.p.map(function (p) {
         var meta = [];
         if (p.range) meta.push("диапазон: " + p.range);
         if (p.units) meta.push("ед.: " + p.units);
@@ -194,9 +220,9 @@
       }).join("");
     }
     if (m.ctx) {
-      h += "<h4>Где это в коде (" + esc(W.tag) + ")</h4>";
+      h += '<details class="code"><summary>Где это в коде (' + esc(W.tag) + ") — " + esc(m.file.split("/").pop()) + ":" + m.line + "</summary>";
       h += '<div class="note">' + (m.gh ? '<a href="' + esc(m.gh) + '" target="_blank" rel="noopener">' + esc(m.file) + ":" + m.line + "</a>" : esc(m.file)) +
-        (m.func ? " · " + esc(m.func) + "()" : "") + "</div><pre>" + esc(m.ctx) + "</pre>";
+        (m.func ? " · " + esc(m.func) + "()" : "") + "</div><pre>" + esc(m.ctx) + "</pre></details>";
     } else if (m.file) {
       h += '<h4>Источник</h4><div class="note">' + esc(m.file) + "</div>";
     }
